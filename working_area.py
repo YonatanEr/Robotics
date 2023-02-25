@@ -1,6 +1,11 @@
 import numpy as np
-from matplotlib import pyplot as plt
 import point_2d
+
+
+def is_in_the_working_area(x, y, z):
+    if y < 0 or z < 0 or (x ** 2 + y ** 2) < 1 or 4 < (x ** 2 + y ** 2):
+        return False
+    return True
 
 
 def working_area_coordinates(n):
@@ -15,14 +20,3 @@ def working_area_coordinates(n):
     y = np.array(y)
     z = np.zeros(n)
     return x, y, z
-
-
-def plot_obstacle(n):
-    plt.figure()
-    ax = plt.axes(projection='3d')
-    x, y, z = working_area_coordinates(n)
-    ax.scatter(x, y, z, color='gray')
-    ax.set_xlim(-2, 2)
-    ax.set_ylim(-0, 2)
-    ax.set_zlim(-0, 0.2)
-    plt.show()

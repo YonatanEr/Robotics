@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import point_2d
 
 
@@ -31,15 +30,4 @@ def obstacle_coordinates(n):
     y = np.array(y)
     z = 0.2 * np.random.rand(n)
     return x, y, z
-
-
-def plot_obstacle(n):
-    plt.figure()
-    ax = plt.axes(projection='3d')
-    x, y, z = obstacle_coordinates(n)
-    ax.plot3D(x, y, z, 'red')
-    ax.set_xlim(-2, 2)
-    ax.set_ylim(-0, 2)
-    ax.set_zlim(-0, 0.2)
-    plt.show()
 

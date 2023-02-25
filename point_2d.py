@@ -1,5 +1,4 @@
 import math
-import numpy as np
 
 
 def cartesian_to_polar(x, y):
