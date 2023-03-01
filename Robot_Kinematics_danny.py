@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import odeint
+from matplotlib import animation
 
 ##Robot geometry##
 h=0.3 #m
@@ -9,14 +10,17 @@ l_2_min=0 #m
 l_2_max=1 #m
 l_3_min=0 #m
 l_3_max=0.25 #m
-m1=1
-m2=1
-m3=0
+m1=2#kg
+m2=0.25#kg
+m3=0.01#kg
 I1=1
 I2=1
 I=I1+I2
-g=9.81
+g=-9.81
 a = [l_1,h,m1,m2,m3,I,g]
+fv = np.random.normal(0, 5, (3,))
+fs = -np.random.normal(0, 5, (3,))
+## q = (theta,l_2,l_3)
 
 
     ##Robot kinamatics##
@@ -36,10 +40,10 @@ def Inverse_Kinematics(loc, a):
     theta = np.arctan2(loc[1], loc[0])
     l_2 = np.around((loc[0] / (np.cos(theta))) - a[0],3)
     q= [np.rad2deg(theta), l_2, l_3]
-    # if l_2<l_2_min or l_2>l_2_max:
-    #     raise ValueError('l_2 is out of range')
-    # if l_3<l_3_min or l_3>l_3_max:
-    #     raise ValueError('l_3 is out of range')
+    if l_2<l_2_min or l_2>l_2_max:
+        raise ValueError('l_2 is out of range')
+    if l_3<l_3_min or l_3>l_3_max:
+        raise ValueError('l_3 is out of range')
     return q
 def Jacobian(q,a):
     c = np.cos(q[0])
@@ -72,113 +76,102 @@ def G_vector(q,a):
     W = a[6] * (a[4] + a[3] / 2)
     G[2] = 1
     return G * W
+
 def RToXyz(r,theta,z):
+    #return [x,y,z]
     return [r*np.cos(np.deg2rad(theta)),r*np.sin(np.deg2rad(theta)),z]
 
-# def friction(q, dq):
-#     fv = np.random.normal(0, 0.01, (3,))
-#     fs = -fv
-#     Ff = np.multiply(fv, dq) + np.multiply(fs, np.sign(dq))
-#     return Ff
+def friction(q, dq):
+    Ff = np.multiply(fv, dq) + np.multiply(fs, np.sign(dq))
+    return Ff
 
-def traj_gen(q1, q2, t, Tf):
-    a0 = q1
-    a1 = np.zeros((2,))
-    a2 = -1.5 * a3 * Tf**2
-    a3 = (q2 - q1) / (Tf**3 - 1.5*Tf**4)
-
-
-    q = a0 + a1*t + a2 * t**2 + a3 * t**3
-    dq = a1 + 2*a2*t + 3*a3*t**2
-    ddq = 2*a2 + 6*a3*t
-
-    return q, dq, ddq
 
 def open_loop(qd, dqd, ddqd):
     u = M_matrix(qd,a).dot(ddqd) + C_matrix(qd, dqd,a).dot(dqd) + G_vector(qd,a)
     return u
 def PD(q, dq, qd):
-    Kp = np.diag([1500, 1000, 500])
-    Kd = np.diag([30, 50, 70])
-    # print(f'q={q}')
-    # print(f'dq={dq}')
-    # print(f'qd={qd}')
-    # print(f'Kp={Kp}')
-    # print(f'Kd={Kd}')
-    u = - Kp.dot(q-qd) - Kd.dot(dq)
-
+    Kp = np.diag([55, 40, 20])
+    Kd = np.diag([25, 30, 10])
+    e=q-qd[:3]
+    G = G_vector(q,a)
+    u = - Kp.dot(e) - Kd.dot(dq) + G
     return u
-def model(x, t, xg):
+
+def computed_torque( q, dq, xg):
+    Kp = np.diag([8000, 4000, 2000])
+    Kd = np.diag([1500, 1000, 500])
+
+    M = M_matrix(q, a)
+    C = C_matrix(q, dq, a)
+    G = G_vector(q, a)
+    v = 0 - Kd.dot(dq - xg[3:]) - Kp.dot(q - xg[:3])
+    u = M.dot( v ) + C.dot( dq ) + G
+    return u
+
+def model1(x, t, xg):
+    # print(x)
     x1 = x[:3]
     x2 = x[3:]
-    # print(x)
+
     # Choose your controller here
     # u = open_loop(xg[:3], xg[3:], np.zeros((3,))).reshape((3,))
-    u = PD(x1, x2, xg).reshape((3,))
-    #u = computed_torque(x1, x2, xg)
-    # u=np.zeros((1,3))
+    u = PD(x1, x2, xg)
+    # u = computed_torque(x1, x2, xg)
 
     invM = np.linalg.inv(M_matrix(x1,a))
     C = C_matrix(x1,x2,a)
     G = G_vector(x1,a)
-    Ff = np.zeros((1,3))
-    # print(invM.dot(C.dot(x2)))
-    dx1 = x2
-    dx2 = invM.dot(invM.dot(C.dot(x2))- G)
-    # dx2 = invM.dot(u - C.dot(x2) - np.transpose(G) - Ff)
-    # print(dx1)
-    # print(f'dx2={invM.dot(C.dot(x2))- G}')
+    Ff =friction(x1,x2)*0
+    dx1 = np.reshape(x2,(1,3))
+    dx2 = np.reshape(invM.dot(np.reshape(u - C.dot(x2) - G - Ff,(3,1))),(1,3))
+    dxdt = np.concatenate((dx1, dx2), axis = 1)
+    return dxdt[0]
 
-    dxdt = np.concatenate((dx1, dx2), axis = 0)
+#set
+k=Inverse_Kinematics(RToXyz(1.5,0,0.1),a)
+b=Inverse_Kinematics(RToXyz(2,140,0.15),a)
+x0 = np.array([np.deg2rad(k[0]),k[1],k[2], 0, 0, 0])
+xg = np.array([np.deg2rad(b[0]),b[1],b[2], 0, 0, 0])
+t = np.linspace(0, 5, 100)
 
-    return dxdt
-
-
-# theta=45
-# r=1.1
-# z=0.3
-#
-# x=np.linspace(1.8,1.4,100)
-# y=np.linspace(1.2,1.7,100)
-# z=np.linspace(0.1,0.2,100)
-# q=Inverse_Kinematics(RToXyz(r,theta,z),a)
-# move=Inverse_Kinematics([x,y,z],a)[0]
-# # plt.plot(x,move)
-# # plt.show()
-# M=M_matrix(q,a)
-# C=C_matrix(q,q,a)
-# G=G_vector(q,a)
-# Ff = friction(q, q)
-# print (G)
-# print(Jacobian(q,a))
-
-x0 = np.array([0.7, -0.5, 0, 1, 2, 2])
-xg = np.array([0.3, 0.4, 0])
-t = np.linspace(0, 3, 1000)
-
-Q = odeint(model, x0, t, args=(xg,))
-print(Q)
-X = np.dtype(float)
-# X = np.array([Direct_Kinematics(q) for q in Q])
-# for q in Q:
-#     print(Direct_Kinematics(q))
+Q = odeint(model1, x0, t, args=(xg,))
 
 # Plot:
-f, (ax1, ax2) = plt.subplots(1, 2, figsize=(12,5))
-ax1.plot(t, np.rad2deg(Q[:,:3]))
+f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12,12))
+
+#R
+ax1.plot(t, np.rad2deg(Q[:,0]))
 ax1.plot([0, np.max(t)], np.rad2deg([xg[0], xg[0]]), '--')
-ax1.plot([0, np.max(t)], np.rad2deg([xg[1], xg[1]]), '--')
+# ax1.plot([0, np.max(t)], np.rad2deg([xg[1], xg[1]]), '--')
 ax1.set_title('Angles')
-ax1.legend(('q1','q2','q3'))
+ax1.legend(('theta','theta target'))
 ax1.set_xlabel('t (sec)')
 ax1.set_ylabel('q (deg)')
 ax1.set_xlim([0, np.max(t)])
 
-# ax2.plot(t, Q[:,2:])
-# ax2.plot([0, np.max(t)], xg[2:], '--')
-# ax2.set_title('Angular velocity')
-# ax2.legend(('w1','w2'))
-# ax2.set_xlabel('t (sec)')
-# ax2.set_ylabel('w (rad/sec)')
-# ax2.set_xlim([0, np.max(t)])
-# plt.show()
+ax2.plot(t, Q[:,3])
+ax2.plot([0, np.max(t)], xg[4:], '--')
+ax2.set_title('Angular velocity')
+ax2.legend(('w_theta','w_theta target'))
+ax2.set_xlabel('t (sec)')
+ax2.set_ylabel('w (rad/sec)')
+ax2.set_xlim([0, np.max(t)])
+
+#PP
+ax3.plot(t, Q[:,1:3])
+ax3.plot([0, np.max(t)], [xg[1], xg[1]], '--')
+ax3.plot([0, np.max(t)], [xg[2], xg[2]], '--')
+ax3.set_title('Liner Movement')
+ax3.legend(('l_2','l_3'))
+ax3.set_xlabel('t (sec)')
+ax3.set_ylabel('q (m)')
+ax3.set_xlim([0, np.max(t)])
+
+ax4.plot(t, Q[:,4:])
+ax4.plot([0, np.max(t)], xg[4:], '--')
+ax4.set_title('Linear velocity')
+ax4.legend(('l_2','l_3'))
+ax4.set_xlabel('t (sec)')
+ax4.set_ylabel('v (m/sec)')
+ax4.set_xlim([0, np.max(t)])
+plt.show()
