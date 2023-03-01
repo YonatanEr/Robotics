@@ -1,7 +1,5 @@
 import numpy as np
 import point_2d
-import scipy
-import matplotlib
 
 
 def obstacle_collide(x, y, z):
@@ -21,9 +19,15 @@ def obstacle_to_point_distance(x, y, z):
 
 
 def obstacle_coordinates(n):
+    x, y = [], []
     r = 0.2 * np.random.rand(n)
     th = 2 * np.pi * np.random.rand(n)
-    x, y = point_2d.polar_to_cartesian_array(r, th)
+    for i in range(n):
+        cart = point_2d.polar_to_cartesian(r[i], th[i])
+        x.append(cart[0])
+        y.append(cart[1] + 1.5)
+    x = np.array(x)
+    y = np.array(y)
     z = 0.2 * np.random.rand(n)
     return x, y, z
 
