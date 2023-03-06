@@ -3,13 +3,13 @@ import obstacle
 import working_area
 import plot_3d
 import move
+import animate
+import angles
 
 # The destination point
 x_product = [-2, 0]
 
-
 xd, yd, zd = x_product[0], x_product[1], 0.1
-n = 2**16
 
 
 def is_legal_point():
@@ -25,33 +25,53 @@ def is_legal_point():
     return True
 
 
+def plot_path_plan():
+    plt.figure(figsize=(10, 10))
+    ax = plt.axes(projection='3d')
+    ax.set_xlim(-2, 2)
+    ax.set_xlabel('x')
+    ax.set_ylim(0, 2)
+    ax.set_ylabel('y')
+    ax.set_zlim(0, 0.3)
+    ax.set_zlabel('z')
+
+    # start point
+    x0, y0, z0 = plot_3d.plot_start_end_points(xd, yd, zd, ax)
+
+    x_points, y_points, z_points = [x0], [y0], [z0]
+
+    # l3 move up
+    move.plot_move_l3(x_points=x_points, y_points=y_points, z_points=z_points, z1=0.25, n=2**3, ax=ax, marker="^")
+
+
+    # circular move
+    move.plot_move_circle(x_points=x_points, y_points=y_points, z_points=z_points, xd=xd, yd=yd, n=2**8, ax=ax)
+
+
+    # l2 move
+    move.plot_move_l2(x_points=x_points, y_points=y_points, z_points=z_points, x1=xd, y1=yd, n=2**3, ax=ax)
+
+
+    # l3 move down
+    move.plot_move_l3(x_points=x_points, y_points=y_points, z_points=z_points, z1=0.1, n=2**3, ax=ax, marker="v")
+
+    #plt.savefig("outputs/3/path_plan.png")
+    plt.show()
+
+    return x_points, y_points, z_points
+
+
+
 def run():
     if not is_legal_point():
         return False
 
-    plt.figure(figsize=(10, 10))
 
-    ax = plt.axes(projection='3d')
-    ax.set_xlim(-2, 2)
-    ax.set_ylim(0, 2)
-    ax.set_zlim(0, 0.3)
+    x_points, y_points, z_points = plot_path_plan()
 
-    # start point
-    x, y, z = plot_3d.plot_start_point(xd, yd, zd, n, ax)
+    angles.plot_angles(x_points=x_points, y_points=y_points)
 
-    # l3 move up
-    x, y, z = move.plot_move_l3(x0=x, y0=y, z0=z, z1=0.25, n=2**5, ax=ax, marker="^")
-
-    # circular move
-    x, y, z = move.plot_move_circle(x0=x, y0=y, z0=z, xd=xd, yd=yd, n=2**8, ax=ax)
-
-    # l2 move
-    x, y, z = move.plot_move_l2(x0=x, y0=y, z0=z, x1=xd, y1=yd, n=2**4, ax=ax)
-
-    # l3 move down
-    x, y, z = move.plot_move_l3(x0=x, y0=y, z0=z, z1=0.1, n=2**5, ax=ax, marker="v")
-
-    plt.show()
+    animate.animate_movement(x_points=x_points, y_points=y_points, z_points=z_points, xd=xd, yd=yd, zd=zd)
 
 
 run()
