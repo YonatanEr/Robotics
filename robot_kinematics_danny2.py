@@ -14,11 +14,10 @@ m2=2#kg
 m3=0.25#kg
 g=9.81
 a = [l_1,h,m1,m2,m3,g]
-Fe = 5*np.array([np.random.rand(),np.random.rand(),np.random.rand(),np.random.rand(),np.random.rand(),np.random.rand()])
+Fe = 0*5*np.array([np.random.rand(),np.random.rand(),np.random.rand(),np.random.rand(),np.random.rand(),np.random.rand()])
 fv = 5*np.array([np.random.rand(),np.random.rand(),np.random.rand()])
 fs = -5*np.array([np.random.rand(),np.random.rand(),np.random.rand()])
-# fv = np.random.rand(0, 5, (3,))
-# fs = -np.random.rand(0, 5, (3,))
+
 ## q = (theta,l_2,l_3)
 
 
@@ -87,33 +86,47 @@ def open_loop(qd, dqd, ddqd):
     u = M_matrix(qd,a).dot(ddqd) + C_matrix(qd, dqd, a).dot(dqd) + G_vector(qd, a)
     return u
 def PD(q, dq, qd):
-    Kp = np.diag([1000, 1000, 700])
-    Kd = np.diag([200, 100, 100])
+    Kp = np.diag([2000, 1500, 1000])
+    Kd = np.diag([200, 200, 200])
     e=q-qd[:3]
     G = G_vector(q,a)
     u = - Kp.dot(e) - Kd.dot(dq) + G
     return u
 
-def computed_torque( q, dq, xg):
-    Kp = np.diag([1000, 1000, 1500])
-    Kd = np.diag([150, 400, 400])
+def computed_torque( q, dq, qd, dqd, ddqd):
+    Kp = np.diag([2000, 1500, 1000])
+    Kd = np.diag([200, 200, 200])
 
     M = M_matrix(q, a)
     C = C_matrix(q, dq, a)
     G = G_vector(q, a)
-    v = 0 - Kd.dot(dq - xg[3:]) - Kp.dot(q - xg[:3])
+    v = ddqd - Kd.dot(dq - dqd) - Kp.dot(q - qd)
     u = M.dot( v ) + C.dot( dq ) + G
     return u
 
-def model1(x, t, xg):
+def traj_gen(q1, q2, t, Tf):
+    a0 = q1
+    a1 = np.zeros((3,))
+    a3 = (q2 - q1) / (Tf**3 - 1.5*Tf**4)
+    a2 = -1.5 * a3 * Tf**2
+
+    q = a0 + a1*t + a2 * t**2 + a3 * t**3
+    dq = a1 + 2*a2*t + 3*a3*t**2
+    ddq = 2*a2 + 6*a3*t
+
+
+    return q, dq, ddq
+def model(x, t, x0, xg, Tf):
     # print(x)
     x1 = x[:3]
     x2 = x[3:]
 
+    qd, dqd, ddqd = traj_gen(x0[:3], xg[:3], t, Tf)
+
     # Choose your controller here
-    # u = open_loop(xg[:3], xg[3:], np.zeros((3,))).reshape((3,))
-    u = PD(x1, x2, xg)
-    # u = computed_torque(x1, x2, xg)
+    # u = open_loop(qd, dqd, ddqd)
+    # u = PD(x1, x2, qd)
+    u = computed_torque(x1, x2, qd, dqd, ddqd)
 
     invM = np.linalg.inv(M_matrix(x1,a))
     C = C_matrix(x1,x2,a)
@@ -131,17 +144,27 @@ k=Inverse_Kinematics(RToXyz(1.5,0,0.1),a)
 b=Inverse_Kinematics(RToXyz(1.75,70,0.15),a)
 x0 = np.array([np.deg2rad(k[0]),k[1],k[2], 0, 0, 0])
 xg = np.array([np.deg2rad(b[0]),b[1],b[2], 0, 0, 0])
-t = np.linspace(0, 5, 100)
+Tf = 5
+t = np.linspace(0, Tf, 500)
 
-Q = odeint(model1, x0, t, args=(xg,))
+
+Q = odeint(model, x0, t, args=(x0, xg, Tf, ))
+# X = np.array([Direct_Kinematics(q) for q in Q])
+
+Qd1 = np.array([traj_gen(x0[0], xg[0], tt, Tf)[0] for tt in t])
+Qd3a = np.array([traj_gen(x0[1], xg[1], tt, Tf)[0] for tt in t])
+Qd3b = np.array([traj_gen(x0[2], xg[2], tt, Tf)[0] for tt in t])
+
+dQd2 = np.array([traj_gen(x0[0], xg[0], tt, Tf)[1] for tt in t])
+dQd4a = np.array([traj_gen(x0[1], xg[1], tt, Tf)[1] for tt in t])
+dQd4b = np.array([traj_gen(x0[2], xg[2], tt, Tf)[1] for tt in t])
 
 # Plot:
 f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12,12))
 
 #R
 ax1.plot(t, np.rad2deg(Q[:,0]))
-ax1.plot([0, np.max(t)], np.rad2deg([xg[0], xg[0]]), '--')
-# ax1.plot([0, np.max(t)], np.rad2deg([xg[1], xg[1]]), '--')
+ax1.plot(t, np.rad2deg(Qd1), '--')
 ax1.set_title('Angles')
 ax1.legend(('theta','theta target'))
 ax1.set_xlabel('t (sec)')
@@ -149,7 +172,7 @@ ax1.set_ylabel('q (deg)')
 ax1.set_xlim([0, np.max(t)])
 
 ax2.plot(t, Q[:,3])
-ax2.plot([0, np.max(t)], xg[4:], '--')
+ax2.plot(t, dQd2, '--')
 ax2.set_title('Angular velocity')
 ax2.legend(('w_theta','w_theta target'))
 ax2.set_xlabel('t (sec)')
@@ -158,8 +181,8 @@ ax2.set_xlim([0, np.max(t)])
 
 #PP
 ax3.plot(t, Q[:,1:3])
-ax3.plot([0, np.max(t)], [xg[1], xg[1]], '--')
-ax3.plot([0, np.max(t)], [xg[2], xg[2]], '--')
+ax3.plot(t, Qd3a, '--')
+ax3.plot(t, Qd3b, '--')
 ax3.set_title('Liner Movement')
 ax3.legend(('l_2','l_3'))
 ax3.set_xlabel('t (sec)')
@@ -167,12 +190,11 @@ ax3.set_ylabel('q (m)')
 ax3.set_xlim([0, np.max(t)])
 
 ax4.plot(t, Q[:,4:])
-ax4.plot([0, np.max(t)], xg[4:], '--')
+ax4.plot(t, dQd4a, '--')
+ax4.plot(t, dQd4b, '--')
 ax4.set_title('Linear velocity')
 ax4.legend(('l_2','l_3'))
 ax4.set_xlabel('t (sec)')
 ax4.set_ylabel('v (m/sec)')
 ax4.set_xlim([0, np.max(t)])
 plt.show()
-
-print(fv,fs)
