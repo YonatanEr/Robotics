@@ -1,4 +1,4 @@
-import obstacle
+import Obstacle
 import sticker_machine
 import working_area
 
@@ -9,7 +9,7 @@ def plot_start_end_points(xd, yd, zd, ax, n = 2**16):
     ax.scatter(x, y, z, color='Gray', s=1, alpha=0.05)
 
     # plots the obstacle
-    x, y, z = obstacle.obstacle_coordinates(n)
+    x, y, z = Obstacle.obstacle_coordinates(n)
     ax.scatter(x, y, z, color='Red', s=100, alpha=0.01)
 
     # plots the sticker machine

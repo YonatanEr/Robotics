@@ -175,4 +175,6 @@ ax4.set_ylabel('v (m/sec)')
 ax4.set_xlim([0, np.max(t)])
 plt.show()
 
+
+
 print(fv,fs)
