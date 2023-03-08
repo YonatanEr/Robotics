@@ -127,8 +127,8 @@ def model(x, t, x0, xg, Tf):
 
     # Choose your controller here
     # u = open_loop(qd, dqd, ddqd)
-    # u = PD(x1, x2, qd)
-    u = computed_torque(x1, x2, qd, dqd, ddqd)
+    u = PD(x1, x2, qd)
+    # u = computed_torque(x1, x2, qd, dqd, ddqd)
 
     invM = np.linalg.inv(M_matrix(x1,a))
     C = C_matrix(x1,x2,a)
@@ -144,21 +144,7 @@ def model(x, t, x0, xg, Tf):
 
 #set
 def make_movement(loc_1,loc_2,n=2**3):
-    h = 0.3  # m
     l_1 = 1  # m
-    l_2_min = 0  # m
-    l_2_max = 1  # m
-    l_3_min = 0  # m
-    l_3_max = 0.25  # m
-    m1 = 0.3  # kg
-    m2 = 2  # kg
-    m3 = 0.25  # kg
-    g = 9.81
-    a = [l_1, h, m1, m2, m3, g]
-    Fe = 0 * 5 * np.array(
-        [np.random.rand(), np.random.rand(), np.random.rand(), np.random.rand(), np.random.rand(), np.random.rand()])
-    fv = 5 * np.array([np.random.rand(), np.random.rand(), np.random.rand()])
-    fs = -5 * np.array([np.random.rand(), np.random.rand(), np.random.rand()])
     k = Inverse_Kinematics(RToXyz(loc_1[0], loc_1[1], loc_1[2]))
     b = Inverse_Kinematics(RToXyz(loc_2[0], loc_2[1], loc_2[2]))
     x0 = np.array([np.deg2rad(k[0]), k[1], k[2], 0, 0, 0])
@@ -175,21 +161,6 @@ def make_movement(loc_1,loc_2,n=2**3):
     return X,Y,Z
 
 def make_Q(loc_1,loc_2,n=2**3):
-    h = 0.3  # m
-    l_1 = 1  # m
-    l_2_min = 0  # m
-    l_2_max = 1  # m
-    l_3_min = 0  # m
-    l_3_max = 0.25  # m
-    m1 = 0.3  # kg
-    m2 = 2  # kg
-    m3 = 0.25  # kg
-    g = 9.81
-    a = [l_1, h, m1, m2, m3, g]
-    Fe = 0 * 5 * np.array(
-        [np.random.rand(), np.random.rand(), np.random.rand(), np.random.rand(), np.random.rand(), np.random.rand()])
-    fv = 5 * np.array([np.random.rand(), np.random.rand(), np.random.rand()])
-    fs = -5 * np.array([np.random.rand(), np.random.rand(), np.random.rand()])
     k = Inverse_Kinematics(RToXyz(loc_1[0], loc_1[1], loc_1[2]))
     b = Inverse_Kinematics(RToXyz(loc_2[0], loc_2[1], loc_2[2]))
     x0 = np.array([np.deg2rad(k[0]), k[1], k[2], 0, 0, 0])
@@ -206,11 +177,10 @@ x0 = np.array([np.deg2rad(k[0]),k[1],k[2], 0, 0, 0])
 xg = np.array([np.deg2rad(b[0]),b[1],b[2], 0, 0, 0])
 Tf = 5
 
-Q=make_Q([1.5,0,0.1],[1.75,70,0.15],n=2**3)
 
 
-def plot_Q(Q,x0,xg,n=2**3):
-    Tf = 5
+
+def plot_Q(Q,x0,xg,n=2**3,Tf=5):
     t = np.linspace(0, Tf, n)
     Qd1 = np.array([traj_gen(x0[0], xg[0], tt, Tf)[0] for tt in t])
     Qd3a = np.array([traj_gen(x0[1], xg[1], tt, Tf)[0] for tt in t])
@@ -227,7 +197,7 @@ def plot_Q(Q,x0,xg,n=2**3):
     ax1.plot(t, np.rad2deg(Q[:,0]))
     ax1.plot(t, np.rad2deg(Qd1)[:,0], '--')
     ax1.set_title('Angles')
-    ax1.legend(('theta','theta target'))
+    ax1.legend(('theta','theta planned path'))
     ax1.set_xlabel('t (sec)')
     ax1.set_ylabel('q (deg)')
     ax1.set_xlim([0, np.max(t)])
@@ -236,7 +206,7 @@ def plot_Q(Q,x0,xg,n=2**3):
     ax2.plot(t, Q[:,3])
     ax2.plot(t, dQd2, '--')
     ax2.set_title('Angular velocity')
-    ax2.legend(('w_theta','w_theta target'))
+    ax2.legend(('w_theta','w_theta planned velocity'))
     ax2.set_xlabel('t (sec)')
     ax2.set_ylabel('w (rad/sec)')
     ax2.set_xlim([0, np.max(t)])
@@ -247,7 +217,7 @@ def plot_Q(Q,x0,xg,n=2**3):
     ax3.plot(t, Qd3a, '--')
     ax3.plot(t, Qd3b, '--')
     ax3.set_title('Liner Movement')
-    ax3.legend(('l_2','l_3'))
+    ax3.legend(('l_2','l_3','l_2 planned path','l_3 planned path'))
     ax3.set_xlabel('t (sec)')
     ax3.set_ylabel('q (m)')
     ax3.set_xlim([0, np.max(t)])
@@ -257,11 +227,11 @@ def plot_Q(Q,x0,xg,n=2**3):
     ax4.plot(t, dQd4a, '--')
     ax4.plot(t, dQd4b, '--')
     ax4.set_title('Linear velocity')
-    ax4.legend(('l_2','l_3'))
+    ax4.legend(('l_2','l_3','l_2 planned velocity','l_3 planned velocity'))
     ax4.set_xlabel('t (sec)')
     ax4.set_ylabel('v (m/sec)')
     ax4.set_xlim([0, np.max(t)])
     plt.show()
 
-
+# Q=make_Q([1.5,0,0.1],[1.75,70,0.15],n=2**3)
 # plot_Q(Q[0],Q[1],Q[2])
